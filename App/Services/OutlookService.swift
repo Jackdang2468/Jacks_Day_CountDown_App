@@ -239,6 +239,9 @@ final class OutlookService {
             event.endDate = c.targetDate.addingTimeInterval(3600)
         }
         event.alarms = [EKAlarm(relativeOffset: -24 * 60 * 60)]
+        event.recurrenceRules = c.repeatsYearly
+            ? [EKRecurrenceRule(recurrenceWith: .yearly, interval: 1, end: nil)]
+            : nil
         try eventStore.save(event, span: .thisEvent, commit: true)
         eventIDs[c.id.uuidString] = event.eventIdentifier
     }
@@ -392,6 +395,14 @@ private struct GraphEvent: Encodable {
     let reminderMinutesBeforeStart = 24 * 60
     let showAs: String
     let categories = ["Day Counter"]
+    let recurrence: Recurrence?
+
+    struct Recurrence: Encodable {
+        struct Pattern: Encodable { let type = "absoluteYearly"; let interval = 1; let month: Int; let dayOfMonth: Int }
+        struct Range: Encodable { let type = "noEnd"; let startDate: String }
+        let pattern: Pattern
+        let range: Range
+    }
 
     init(_ c: Countdown) {
         let calendar = Calendar.current
@@ -403,6 +414,15 @@ private struct GraphEvent: Encodable {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
 
         subject = [c.emoji, c.title].compactMap { $0 }.joined(separator: " ")
+        if c.repeatsYearly {
+            let parts = calendar.dateComponents([.year, .month, .day], from: c.targetDate)
+            recurrence = Recurrence(
+                pattern: .init(month: parts.month ?? 1, dayOfMonth: parts.day ?? 1),
+                range: .init(startDate: String(format: "%04d-%02d-%02d", parts.year ?? 2000, parts.month ?? 1, parts.day ?? 1))
+            )
+        } else {
+            recurrence = nil
+        }
         body = Body(content: c.notes.isEmpty ? "Added by Jack's Day Counter." : c.notes)
         isAllDay = c.isAllDay
         if c.isAllDay {

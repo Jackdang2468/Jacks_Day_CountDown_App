@@ -27,6 +27,9 @@ struct AddToCalendarSheet: UIViewControllerRepresentable {
             event.endDate = countdown.targetDate.addingTimeInterval(60 * 60)
         }
         event.addAlarm(EKAlarm(relativeOffset: -24 * 60 * 60))
+        if countdown.repeatsYearly {
+            event.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: .yearly, interval: 1, end: nil))
+        }
 
         let controller = EKEventEditViewController()
         controller.eventStore = store
@@ -81,6 +84,9 @@ enum ICSFile {
         } else {
             lines.append("DTSTART:\(utc.string(from: countdown.targetDate))")
             lines.append("DTEND:\(utc.string(from: countdown.targetDate.addingTimeInterval(3600)))")
+        }
+        if countdown.repeatsYearly {
+            lines.append("RRULE:FREQ=YEARLY")
         }
         if !countdown.notes.isEmpty {
             lines.append("DESCRIPTION:\(escape(countdown.notes))")

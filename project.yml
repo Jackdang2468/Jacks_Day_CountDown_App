@@ -46,6 +46,8 @@ targets:
         NSCalendarsWriteOnlyAccessUsageDescription: Day Counter adds your countdown events to the calendar you choose, such as Outlook.
         NSCalendarsFullAccessUsageDescription: Day Counter adds your countdowns to your Outlook calendar on this iPhone and keeps them up to date.
         NSCalendarsUsageDescription: Day Counter adds your countdown events to the calendar you choose, such as Outlook.
+        NSFaceIDUsageDescription: Day Counter uses Face ID to unlock the app when you turn on app lock.
+        NSSupportsLiveActivities: true
         NSPhotoLibraryUsageDescription: Choose a photo to show on your countdown and its widgets.
         AppGroupID: $(APP_GROUP_ID)
         SupabaseHost: $(SUPABASE_HOST)

@@ -35,7 +35,7 @@ struct CountdownProvider: AppIntentTimelineProvider {
         if let id = configuration.countdown?.id, let match = all.first(where: { $0.id == id }) {
             return match
         }
-        return all.first { !$0.isPast } ?? all.first
+        return CountdownPicker.featured(in: all)
     }
 }
 
@@ -143,7 +143,7 @@ struct CountdownWidgetView: View {
                 .font(family == .systemSmall ? .subheadline.bold() : .headline)
                 .lineLimit(family == .systemSmall ? 2 : 1)
             if family != .systemSmall {
-                Text(c.targetDate, format: .dateTime.weekday(.wide).month().day().year())
+                Text(c.nextDate(from: entry.date), format: .dateTime.weekday(.wide).month().day().year())
                     .font(.caption)
                     .opacity(0.85)
             }

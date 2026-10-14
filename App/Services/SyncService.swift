@@ -12,6 +12,9 @@ struct CountdownRecord: Codable {
     var theme: String
     var emoji: String?
     var imageKey: String?
+    var repeatsYearly: Bool
+    var isPinned: Bool
+    var remindersEnabled: Bool
     var createdAt: Date
     var updatedAt: Date
 
@@ -21,6 +24,9 @@ struct CountdownRecord: Codable {
         case targetDate = "target_date"
         case isAllDay = "is_all_day"
         case imageKey = "image_key"
+        case repeatsYearly = "repeats_yearly"
+        case isPinned = "is_pinned"
+        case remindersEnabled = "reminders_enabled"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -35,15 +41,38 @@ struct CountdownRecord: Codable {
         theme = c.theme.rawValue
         emoji = c.emoji
         imageKey = c.imageKey
+        repeatsYearly = c.repeatsYearly
+        isPinned = c.isPinned
+        remindersEnabled = c.remindersEnabled
         createdAt = c.createdAt
         updatedAt = c.updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        title = try c.decode(String.self, forKey: .title)
+        targetDate = try c.decode(Date.self, forKey: .targetDate)
+        isAllDay = try c.decode(Bool.self, forKey: .isAllDay)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        theme = try c.decodeIfPresent(String.self, forKey: .theme) ?? "ocean"
+        emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
+        imageKey = try c.decodeIfPresent(String.self, forKey: .imageKey)
+        repeatsYearly = try c.decodeIfPresent(Bool.self, forKey: .repeatsYearly) ?? false
+        isPinned = try c.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        remindersEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     }
 
     var countdown: Countdown {
         Countdown(
             id: id, title: title, targetDate: targetDate, isAllDay: isAllDay,
             notes: notes, theme: CountdownTheme(rawValue: theme) ?? .ocean,
-            emoji: emoji, imageKey: imageKey, createdAt: createdAt, updatedAt: updatedAt
+            emoji: emoji, imageKey: imageKey, repeatsYearly: repeatsYearly,
+            isPinned: isPinned, remindersEnabled: remindersEnabled,
+            createdAt: createdAt, updatedAt: updatedAt
         )
     }
 }

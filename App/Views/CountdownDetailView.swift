@@ -11,6 +11,8 @@ struct CountdownDetailView: View {
     @State private var confirmDelete = false
     @State private var outlookBusy = false
     @State private var outlookMessage: String?
+    @State private var shareImage: UIImage?
+    @State private var liveActivityMessage: String?
 
     private var countdown: Countdown? { store.countdowns.first { $0.id == countdownID } }
 
@@ -35,23 +37,29 @@ struct CountdownDetailView: View {
                 Text(countdown.title)
                     .font(.largeTitle.bold())
                     .multilineTextAlignment(.center)
-                Text(countdown.targetDate, format: countdown.isAllDay
+                Text(countdown.nextDate(), format: countdown.isAllDay
                      ? .dateTime.weekday(.wide).month(.wide).day().year()
                      : .dateTime.weekday(.wide).month(.wide).day().year().hour().minute())
                     .font(.headline)
                     .opacity(0.85)
 
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    LiveCountdown(target: countdown.isAllDay
-                                  ? Calendar.current.startOfDay(for: countdown.targetDate)
-                                  : countdown.targetDate,
-                                  now: context.date)
+                    LiveCountdown(target: countdown.eventStart(from: context.date), now: context.date)
                 }
                 .padding(.vertical, 8)
 
                 if calendarAdded {
                     Label("Added to your calendar", systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
+                }
+                if let n = countdown.upcomingAnniversary() {
+                    Label("\(n.ordinal) anniversary", systemImage: "repeat")
+                        .font(.subheadline.weight(.semibold))
+                }
+                if let liveActivityMessage {
+                    Text(liveActivityMessage)
+                        .font(.subheadline.weight(.semibold))
+                        .multilineTextAlignment(.center)
                 }
                 if let outlookMessage {
                     Text(outlookMessage)
@@ -103,6 +111,35 @@ struct CountdownDetailView: View {
         .toolbar {
             Menu {
                 Button("Edit", systemImage: "pencil") { isEditing = true }
+                Button(countdown.isPinned ? "Unpin" : "Pin to top",
+                       systemImage: countdown.isPinned ? "pin.slash" : "pin") {
+                    store.togglePin(countdown)
+                }
+                if let shareImage {
+                    ShareLink(item: Image(uiImage: shareImage),
+                              preview: SharePreview(countdown.title, image: Image(uiImage: shareImage))) {
+                        Label("Share image", systemImage: "photo.on.rectangle")
+                    }
+                }
+                if LiveActivityManager.isEligible(countdown) {
+                    if LiveActivityManager.isRunning(countdown.id) {
+                        Button("Stop Live Activity", systemImage: "stop.circle") {
+                            Task {
+                                await LiveActivityManager.stop(countdown.id)
+                                liveActivityMessage = nil
+                            }
+                        }
+                    } else {
+                        Button("Start Live Activity", systemImage: "timer") {
+                            do {
+                                try LiveActivityManager.start(countdown)
+                                liveActivityMessage = "Live countdown is on your Lock Screen"
+                            } catch {
+                                liveActivityMessage = "Live Activities are off. Turn them on in iPhone Settings > Day Counter."
+                            }
+                        }
+                    }
+                }
                 Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = true }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -110,6 +147,9 @@ struct CountdownDetailView: View {
         }
         .sheet(isPresented: $isEditing) {
             CountdownEditorView(original: countdown)
+        }
+        .task(id: countdown) {
+            shareImage = ShareCardView.render(countdown)
         }
         .sheet(isPresented: $showCalendar) {
             AddToCalendarSheet(countdown: countdown) { saved in

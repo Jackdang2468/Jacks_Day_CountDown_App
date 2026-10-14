@@ -7,6 +7,7 @@ struct CountdownListView: View {
     @State private var isCreating = false
     @State private var showSettings = false
     @State private var showPast = false
+    @AppStorage("list.sort") private var sort: CountdownSort = .soonest
 
     var body: some View {
         NavigationStack {
@@ -26,7 +27,7 @@ struct CountdownListView: View {
                         EmptyStateView { isCreating = true }
                     }
 
-                    ForEach(store.upcoming) { item in
+                    ForEach(store.upcoming(sortedBy: sort)) { item in
                         card(for: item)
                     }
 
@@ -60,7 +61,17 @@ struct CountdownListView: View {
                     .accessibilityLabel("Account and settings")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    if store.isSyncing { ProgressView() }
+                    HStack {
+                        if store.isSyncing { ProgressView() }
+                        Menu {
+                            Picker("Sort", selection: $sort) {
+                                ForEach(CountdownSort.allCases) { Text($0.label).tag($0) }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down.circle")
+                        }
+                        .accessibilityLabel("Sort")
+                    }
                 }
             }
             .overlay(alignment: .bottomTrailing) {
@@ -97,6 +108,10 @@ struct CountdownListView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
+            Button(item.isPinned ? "Unpin" : "Pin to top",
+                   systemImage: item.isPinned ? "pin.slash" : "pin") {
+                withAnimation { store.togglePin(item) }
+            }
             Button("Edit", systemImage: "pencil") { editing = item }
             Button("Delete", systemImage: "trash", role: .destructive) {
                 withAnimation { store.delete(item) }
@@ -112,14 +127,29 @@ struct CountdownCard: View {
         let days = countdown.daysRemaining()
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
-                if let emoji = countdown.emoji, !emoji.isEmpty {
-                    Text(emoji).font(.largeTitle)
+                HStack(spacing: 8) {
+                    if let emoji = countdown.emoji, !emoji.isEmpty {
+                        Text(emoji).font(.largeTitle)
+                    }
+                    if countdown.isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.caption.bold())
+                            .padding(6)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
                 }
                 Spacer(minLength: 0)
                 Text(countdown.title)
                     .font(.title3.bold())
                     .lineLimit(2)
-                Text(countdown.targetDate, format: countdown.isAllDay
+                if let n = countdown.upcomingAnniversary() {
+                    Label("\(n.ordinal) · yearly", systemImage: "repeat")
+                        .font(.caption.weight(.semibold))
+                } else if countdown.repeatsYearly {
+                    Label("Yearly", systemImage: "repeat")
+                        .font(.caption.weight(.semibold))
+                }
+                Text(countdown.nextDate(), format: countdown.isAllDay
                      ? .dateTime.weekday(.abbreviated).month().day().year()
                      : .dateTime.weekday(.abbreviated).month().day().hour().minute())
                     .font(.subheadline)

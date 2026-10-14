@@ -1,3 +1,4 @@
+import AppIntents
 import Foundation
 import Observation
 import WidgetKit
@@ -21,8 +22,29 @@ final class CountdownStore {
         countdowns = CountdownFile.load().sorted(by: Self.order)
     }
 
-    var upcoming: [Countdown] { countdowns.filter { !$0.isPast } }
-    var past: [Countdown] { countdowns.filter(\.isPast).reversed() }
+    var past: [Countdown] {
+        countdowns.filter(\.isPast).sorted { $0.targetDate > $1.targetDate }
+    }
+
+    func upcoming(sortedBy sort: CountdownSort) -> [Countdown] {
+        let now = Date.now
+        let items = countdowns.filter { !$0.isPast }
+        let sorted: [Countdown]
+        switch sort {
+        case .soonest: sorted = items.sorted { $0.nextDate(from: now) < $1.nextDate(from: now) }
+        case .latest: sorted = items.sorted { $0.nextDate(from: now) > $1.nextDate(from: now) }
+        case .name: sorted = items.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        case .newest: sorted = items.sorted { $0.createdAt > $1.createdAt }
+        }
+        // Pinned countdowns always come first.
+        return sorted.filter(\.isPinned) + sorted.filter { !$0.isPinned }
+    }
+
+    func togglePin(_ countdown: Countdown) {
+        var item = countdown
+        item.isPinned.toggle()
+        save(item, newImage: nil, removeImage: false)
+    }
 
     // MARK: Account
 
@@ -144,6 +166,22 @@ final class CountdownStore {
         CountdownFile.save(countdowns)
         pending.save()
         WidgetCenter.shared.reloadAllTimelines()
+        refreshSystemFeatures()
+    }
+
+    /// Reminders, Live Activities, and Siri's list of countdown names all
+    /// follow the current countdowns.
+    func refreshSystemFeatures() {
+        let snapshot = countdowns
+        Task {
+            // Asks once, the first time there is something to remind about.
+            if !snapshot.isEmpty && ReminderScheduler.isEnabled {
+                await ReminderScheduler.requestPermission()
+            }
+            await ReminderScheduler.reschedule(snapshot)
+            await LiveActivityManager.refresh(snapshot)
+        }
+        DayCounterShortcuts.updateAppShortcutParameters()
     }
 
     private func wipeLocal() {
@@ -178,5 +216,18 @@ private struct PendingChanges: Codable {
     func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
         try? data.write(to: Self.url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+}
+
+enum CountdownSort: String, CaseIterable, Identifiable {
+    case soonest, latest, name, newest
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .soonest: return "Soonest first"
+        case .latest: return "Latest first"
+        case .name: return "Name"
+        case .newest: return "Recently added"
+        }
     }
 }

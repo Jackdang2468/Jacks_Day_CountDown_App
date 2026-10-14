@@ -5,6 +5,10 @@ struct SettingsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(CountdownStore.self) private var store
     @Environment(OutlookService.self) private var outlook
+    @Environment(AppLock.self) private var appLock
+    @State private var remindersOn = ReminderScheduler.isEnabled
+    @State private var reminderHour = ReminderScheduler.hour
+    @State private var liveActivitiesAuto = LiveActivityManager.autoStart
     @Environment(\.dismiss) private var dismiss
     @State private var confirmSignOut = false
 
@@ -75,6 +79,54 @@ struct SettingsView: View {
                              ? "Sign in with your Microsoft work, school, or personal account. Events you add or edit here appear in your Outlook calendar, with a reminder the day before. Deleting a countdown removes its Outlook event."
                              : "Uses the Outlook account on this iPhone (Settings > Calendar > Accounts). Events you add or edit here appear in your Outlook calendar, with a reminder the day before. Deleting a countdown removes its Outlook event.")
                     }
+                }
+
+                Section {
+                    Toggle("Reminders", isOn: $remindersOn)
+                    if remindersOn {
+                        Picker("All-day reminders at", selection: $reminderHour) {
+                            ForEach(5..<23) { hour in
+                                Text(Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: .now)!,
+                                     format: .dateTime.hour())
+                                    .tag(hour)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Notifications")
+                } footer: {
+                    Text("1 week before, 1 day before, and on the day. Turn reminders off for a single countdown in its edit screen.")
+                }
+                .onChange(of: remindersOn) { _, on in
+                    ReminderScheduler.isEnabled = on
+                    store.refreshSystemFeatures()
+                }
+                .onChange(of: reminderHour) { _, hour in
+                    ReminderScheduler.hour = hour
+                    store.refreshSystemFeatures()
+                }
+
+                Section {
+                    Toggle("Start automatically", isOn: $liveActivitiesAuto)
+                        .onChange(of: liveActivitiesAuto) { _, on in
+                            LiveActivityManager.autoStart = on
+                            store.refreshSystemFeatures()
+                        }
+                } header: {
+                    Text("Live Activities")
+                } footer: {
+                    Text("In the last 8 hours before an event, a live timer appears on your Lock Screen and in the Dynamic Island. It starts when you open the app during that window, or from a countdown's ••• menu.")
+                }
+
+                Section {
+                    Toggle("Require \(appLock.biometryName)", isOn: Binding(
+                        get: { appLock.isEnabled },
+                        set: { on in Task { await appLock.setEnabled(on) } }
+                    ))
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("Locks the app whenever you leave it. Widgets stay visible.")
                 }
 
                 Section {

@@ -5,5 +5,6 @@ import WidgetKit
 struct JacksDayCounterWidgetBundle: WidgetBundle {
     var body: some Widget {
         CountdownWidget()
+        CountdownLiveActivity()
     }
 }

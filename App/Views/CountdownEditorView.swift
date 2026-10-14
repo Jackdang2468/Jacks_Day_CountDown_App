@@ -43,10 +43,26 @@ struct CountdownEditorView: View {
                         set: { draft.emoji = String($0.prefix(2)).isEmpty ? nil : String($0.prefix(2)) }
                     ))
                     Toggle("All-day", isOn: $draft.isAllDay)
-                    DatePicker("Date", selection: $draft.targetDate,
+                    DatePicker(draft.repeatsYearly ? "Original date" : "Date", selection: $draft.targetDate,
                                displayedComponents: draft.isAllDay ? [.date] : [.date, .hourAndMinute])
+                    Toggle(isOn: $draft.repeatsYearly) {
+                        Label("Repeats every year", systemImage: "repeat")
+                    }
                     TextField("Notes", text: $draft.notes, axis: .vertical)
                         .lineLimit(1...4)
+                }
+
+                Section {
+                    Toggle(isOn: $draft.remindersEnabled) {
+                        Label("Reminders", systemImage: "bell.badge")
+                    }
+                    Toggle(isOn: $draft.isPinned) {
+                        Label("Pin to top", systemImage: "pin")
+                    }
+                } footer: {
+                    Text(draft.repeatsYearly
+                         ? "For birthdays and anniversaries, enter the original date (like the birth date). The countdown rolls over to next year automatically."
+                         : "Reminders arrive 1 week before, 1 day before, and on the day.")
                 }
 
                 Section("Look") {
@@ -147,7 +163,7 @@ struct CountdownEditorView: View {
                         .font(.title3.bold())
                 }
                 Spacer()
-                let days = DayMath.days(from: .now, to: draft.targetDate)
+                let days = draft.daysRemaining()
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("\(abs(days))")
                         .font(.system(size: 48, weight: .bold, design: .rounded))
