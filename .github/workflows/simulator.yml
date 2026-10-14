@@ -50,9 +50,27 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            PROVISIONING_PROFILE_SPECIFIER= \
             | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" build.log
+
+      # Widgets read countdowns through the App Group, so the Simulator copy
+      # must carry its entitlements (an unsigned build leaves widgets blank).
+      - name: Check App Group entitlements
+        run: |
+          cd build/Build/Products/Debug-iphonesimulator
+          # Simulator builds keep entitlements in the binary's __entitlements
+          # section, device builds in the code signature; accept either.
+          for bundle in JacksDayCounter.app JacksDayCounter.app/PlugIns/JacksDayCounterWidgets.appex; do
+            exe="$bundle/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle/Info.plist")"
+            echo "== $bundle"
+            { codesign -d --entitlements - --xml "$bundle" 2>/dev/null; strings "$exe"; } \
+              | grep -o 'group\.[A-Za-z0-9.-]*' | sort -u | tee /tmp/groups.txt
+            [ -s /tmp/groups.txt ] || { echo "::error::$bundle is missing its App Group entitlement"; exit 1; }
+          done
 
       - name: Package for Appetize
         run: |
