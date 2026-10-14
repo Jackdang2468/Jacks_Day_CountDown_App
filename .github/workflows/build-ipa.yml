@@ -33,7 +33,7 @@ jobs:
             echo "::warning::SUPABASE_HOST secret not set; the app will run without sync."
           fi
           if [ -z "$MS_CLIENT_ID" ]; then
-            echo "::warning::MS_CLIENT_ID secret not set; Connect Outlook will be hidden."
+            echo "::notice::MS_CLIENT_ID not set; Connect Outlook uses the iPhone's Outlook account."
           fi
           {
             printf 'SUPABASE_HOST = %s\n' "$SUPABASE_HOST"

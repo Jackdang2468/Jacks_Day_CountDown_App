@@ -107,18 +107,27 @@ cyan/blue/violet palette, smooth number transitions, Dark Mode support.
 | Backend | Supabase | Firebase (Auth + Firestore), also free. Or no backend at all with iCloud, but iCloud needs a paid developer account. |
 | Install | Sideloadly / AltStore | Xcode on a Mac (most reliable), or a paid developer account for 1-year installs. |
 
-## Ideas for later (your call)
+## Extra features
 
-These aren't built. Say which you'd like and I'll add them.
-
-1. **Reminders**: local notifications at milestones (1 week, 1 day, day-of).
-   Free, no server needed.
-2. **Repeating events**: birthdays and anniversaries that roll over to next
-   year automatically.
-3. **Face ID lock**: require Face ID to open the app.
-4. **Share card**: export a pretty image of a countdown to send to friends.
-5. **Siri and Shortcuts**: "Hey Siri, how many days until vacation?"
-6. **Count-up mode**: "days since" trackers (quit a habit, relationship, etc.).
-7. **Sort and pin**: pin a favorite to the top, sort by date or name.
-8. **Live Activity**: a live timer on the Lock Screen and Dynamic Island in
-   the final hours before an event.
+- **Reminders.** Notifications 1 week before, 1 day before, and on the day
+  (9 AM for all-day events; change the hour in Settings). Turn them off for
+  one countdown in its edit screen, or for all in Settings.
+- **Yearly repeats.** Turn on "Repeats every year" for birthdays and
+  anniversaries and enter the original date. The countdown rolls over each
+  year, shows which anniversary is next (e.g. "30th"), and calendar exports
+  repeat yearly.
+- **Face ID lock.** Settings > Privacy > Require Face ID. The app locks when
+  you leave it; widgets stay visible. Falls back to your passcode.
+- **Share image.** A countdown's ••• menu > Share image makes a 1080×1350
+  picture to send by Messages or post.
+- **Siri and Shortcuts.** "Hey Siri, how many days until Vacation in Day
+  Counter" or "What's next in Day Counter". The Shortcuts app also gets a
+  "Days Until Countdown" action that returns the number of days.
+- **Pin and sort.** Long-press a countdown > Pin to top. The sort button
+  (top right) orders by soonest, latest, name, or recently added. Widgets
+  show your pinned countdown unless you choose another.
+- **Live Activity.** In the last 8 hours before an event, a live timer
+  appears on the Lock Screen and in the Dynamic Island. It starts when you
+  open the app in that window (or from ••• > Start Live Activity); iOS
+  limits Live Activities to 8 hours and can't start one while the app has
+  never been opened in that window.

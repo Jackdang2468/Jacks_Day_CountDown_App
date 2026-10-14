@@ -16,7 +16,11 @@ About 10 minutes, all free. You only do this once.
 2. Paste the whole contents of
    [`supabase/migrations/0001_countdowns.sql`](../supabase/migrations/0001_countdowns.sql)
    and click **Run**. You should see "Success. No rows returned".
-3. Check **Table Editor**: a `countdowns` table with a "RLS enabled" badge.
+3. Run [`supabase/migrations/0002_features.sql`](../supabase/migrations/0002_features.sql)
+   the same way. It adds the columns for yearly repeats, pinning, and
+   reminders. (If you set up Supabase before this file existed, run just
+   this one now; until you do, syncing shows "Couldn't sync".)
+4. Check **Table Editor**: a `countdowns` table with a "RLS enabled" badge.
    Check **Storage**: a private `countdown-images` bucket.
 
 ## 3. Email confirmation (pick one)
