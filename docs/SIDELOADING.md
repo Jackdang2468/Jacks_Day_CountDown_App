@@ -14,10 +14,12 @@ and confirm.
 
 ## Step 2. Get the app file
 
-1. Open the repository on GitHub > **Actions** > **Build unsigned IPA**.
-2. Click the latest green run (or **Run workflow** to make a fresh one).
-3. Under **Artifacts**, download **JacksDayCounter-ipa** and unzip it. You
-   now have `JacksDayCounter.ipa`.
+Download it straight from the latest release (no sign-in needed):
+<https://github.com/Jackdang2468/Jacks_Day_CountDown_App/releases/latest/download/JacksDayCounter.ipa>
+
+Or open the repository's **Releases** (right-hand side of the repo page) >
+**Latest build** > `JacksDayCounter.ipa`. Every merge to main replaces it
+with a fresh build.
 
 ## Step 3. Install Sideloadly on your computer
 
