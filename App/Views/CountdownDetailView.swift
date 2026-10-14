@@ -3,11 +3,14 @@ import SwiftUI
 struct CountdownDetailView: View {
     let countdownID: Countdown.ID
     @Environment(CountdownStore.self) private var store
+    @Environment(OutlookService.self) private var outlook
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
     @State private var showCalendar = false
     @State private var calendarAdded = false
     @State private var confirmDelete = false
+    @State private var outlookBusy = false
+    @State private var outlookMessage: String?
 
     private var countdown: Countdown? { store.countdowns.first { $0.id == countdownID } }
 
@@ -50,20 +53,42 @@ struct CountdownDetailView: View {
                     Label("Added to your calendar", systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                 }
+                if let outlookMessage {
+                    Text(outlookMessage)
+                        .font(.subheadline.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                }
                 Spacer()
 
                 HStack(spacing: 12) {
-                    Button {
-                        showCalendar = true
-                    } label: {
-                        Label("Add to Calendar", systemImage: "calendar.badge.plus")
+                    if outlook.isConfigured {
+                        Button {
+                            Task { await sendToOutlook(countdown) }
+                        } label: {
+                            Group {
+                                if outlookBusy {
+                                    ProgressView()
+                                } else {
+                                    Label(outlook.isLinked(countdown) ? "Update Outlook" : "Add to Outlook",
+                                          systemImage: "calendar.badge.plus")
+                                }
+                            }
                             .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    if let ics = ICSFile.make(for: countdown) {
-                        ShareLink(item: ics) {
-                            Label("Share .ics", systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
+                        .disabled(outlookBusy)
+                    }
+                    Menu {
+                        Button("iPhone Calendar", systemImage: "calendar") { showCalendar = true }
+                        if let ics = ICSFile.make(for: countdown) {
+                            ShareLink(item: ics) {
+                                Label("Share .ics file", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    } label: {
+                        Label(outlook.isConfigured ? "More" : "Add to Calendar",
+                              systemImage: outlook.isConfigured ? "ellipsis" : "calendar.badge.plus")
+                            .frame(maxWidth: outlook.isConfigured ? nil : .infinity, minHeight: 44)
+                            .padding(.horizontal, outlook.isConfigured ? 8 : 0)
                     }
                 }
                 .buttonStyle(.bordered)
@@ -98,6 +123,26 @@ struct CountdownDetailView: View {
                 store.delete(countdown)
                 dismiss()
             }
+        }
+    }
+}
+
+extension CountdownDetailView {
+    private func sendToOutlook(_ countdown: Countdown) async {
+        outlookBusy = true
+        defer { outlookBusy = false }
+        outlookMessage = nil
+        if !outlook.isConnected { await outlook.connect() }
+        guard outlook.isConnected else {
+            outlookMessage = outlook.errorMessage
+            return
+        }
+        do {
+            let wasLinked = outlook.isLinked(countdown)
+            try await outlook.addOrUpdate(countdown)
+            outlookMessage = wasLinked ? "Updated in Outlook" : "Added to Outlook"
+        } catch {
+            outlookMessage = error.localizedDescription
         }
     }
 }

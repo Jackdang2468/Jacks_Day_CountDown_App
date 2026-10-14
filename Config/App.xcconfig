@@ -11,4 +11,10 @@ APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).daycounter
 SUPABASE_HOST =
 SUPABASE_ANON_KEY =
 
+// Microsoft Entra app registration for "Connect Outlook" (see docs/OUTLOOK.md).
+// MS_TENANT: "common" (work/school + personal accounts), "organizations"
+// (work/school only), or your tenant ID (your organization only).
+MS_CLIENT_ID =
+MS_TENANT = common
+
 #include? "Secrets.xcconfig"

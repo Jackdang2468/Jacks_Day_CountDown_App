@@ -13,6 +13,8 @@ final class CountdownStore {
     private(set) var lastSynced: Date?
 
     private var sync: SyncService?
+    /// Mirrors saves and deletes to Outlook when connected.
+    var outlook: OutlookService?
     private var pending = PendingChanges.load()
 
     init() {
@@ -46,7 +48,7 @@ final class CountdownStore {
 
     // MARK: Editing
 
-    func save(_ countdown: Countdown, newImage: Data?, removeImage: Bool) {
+    func save(_ countdown: Countdown, newImage: Data?, removeImage: Bool, addToOutlook: Bool = false) {
         var item = countdown
         item.updatedAt = .now
         let old = countdowns.first { $0.id == item.id }
@@ -72,7 +74,11 @@ final class CountdownStore {
         }
         pending.upserts.insert(item.id)
         persist()
-        Task { await syncNow() }
+        let saved = item
+        Task {
+            await syncNow()
+            await outlook?.countdownSaved(saved, isNew: old == nil, force: addToOutlook)
+        }
     }
 
     func delete(_ countdown: Countdown) {
@@ -85,7 +91,10 @@ final class CountdownStore {
         pending.upserts.remove(countdown.id)
         pending.deletes.insert(countdown.id)
         persist()
-        Task { await syncNow() }
+        Task {
+            await syncNow()
+            await outlook?.remove(countdown)
+        }
     }
 
     // MARK: Sync

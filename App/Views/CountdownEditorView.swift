@@ -4,6 +4,7 @@ import SwiftUI
 struct CountdownEditorView: View {
     let original: Countdown?
     @Environment(CountdownStore.self) private var store
+    @Environment(OutlookService.self) private var outlook
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft: Countdown
@@ -12,6 +13,7 @@ struct CountdownEditorView: View {
     @State private var removeImage = false
     @State private var addToCalendar = false
     @State private var showCalendarSheet = false
+    @State private var isSaving = false
 
     init(original: Countdown?) {
         self.original = original
@@ -80,9 +82,15 @@ struct CountdownEditorView: View {
 
                 if original == nil {
                     Section {
-                        Toggle("Add to my calendar (Outlook)", isOn: $addToCalendar)
+                        Toggle(outlook.isConfigured ? "Add to Outlook" : "Add to my calendar", isOn: $addToCalendar)
                     } footer: {
-                        Text("After saving, pick your Outlook or Exchange calendar in the next screen.")
+                        if outlook.isConfigured {
+                            Text(outlook.isConnected
+                                 ? "Adds this event to \(outlook.accountName ?? "your Outlook") calendar with a reminder the day before."
+                                 : "You'll sign in to your Microsoft account once, then events go straight to Outlook.")
+                        } else {
+                            Text("After saving, pick your Outlook or Exchange calendar in the next screen.")
+                        }
                     }
                 }
             }
@@ -93,10 +101,13 @@ struct CountdownEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(draft.title.trimmed.isEmpty)
+                    Button("Save") { Task { await save() } }
+                        .disabled(draft.title.trimmed.isEmpty || isSaving)
                         .fontWeight(.semibold)
                 }
+            }
+            .onAppear {
+                if original == nil && outlook.isConnected { addToCalendar = outlook.autoAdd }
             }
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
@@ -150,8 +161,17 @@ struct CountdownEditorView: View {
         .animation(.smooth, value: draft.targetDate)
     }
 
-    private func save() {
+    private func save() async {
         draft.title = draft.title.trimmed
+        if addToCalendar && outlook.isConfigured {
+            isSaving = true
+            if !outlook.isConnected { await outlook.connect() }
+            isSaving = false
+            store.save(draft, newImage: newImageData, removeImage: removeImage,
+                       addToOutlook: outlook.isConnected)
+            dismiss()
+            return
+        }
         store.save(draft, newImage: newImageData, removeImage: removeImage)
         if addToCalendar {
             showCalendarSheet = true

@@ -4,6 +4,7 @@ import WidgetKit
 struct SettingsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(CountdownStore.self) private var store
+    @Environment(OutlookService.self) private var outlook
     @Environment(\.dismiss) private var dismiss
     @State private var confirmSignOut = false
 
@@ -27,6 +28,36 @@ struct SettingsView: View {
                             Task { await store.syncNow() }
                         }
                         .disabled(store.isSyncing)
+                    }
+                }
+
+                if outlook.isConfigured {
+                    Section {
+                        if let account = outlook.accountName {
+                            LabeledContent("Connected", value: account)
+                            Toggle("Add new countdowns automatically", isOn: Bindable(outlook).autoAdd)
+                            Button("Disconnect Outlook", role: .destructive) { outlook.disconnect() }
+                        } else {
+                            Button {
+                                Task { await outlook.connect() }
+                            } label: {
+                                HStack {
+                                    Label("Connect Outlook", systemImage: "envelope.badge.shield.half.filled")
+                                    Spacer()
+                                    if outlook.isWorking { ProgressView() }
+                                }
+                            }
+                            .disabled(outlook.isWorking)
+                        }
+                        if let error = outlook.errorMessage {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text("Outlook")
+                    } footer: {
+                        Text("Sign in with your Microsoft work, school, or personal account. Events you add or edit here appear in your Outlook calendar, with a reminder the day before. Deleting a countdown removes its Outlook event.")
                     }
                 }
 

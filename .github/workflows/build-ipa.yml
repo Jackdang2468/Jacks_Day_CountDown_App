@@ -26,11 +26,21 @@ jobs:
         env:
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_TENANT: ${{ secrets.MS_TENANT }}
         run: |
           if [ -z "$SUPABASE_HOST" ]; then
             echo "::warning::SUPABASE_HOST secret not set; the app will run without sync."
           fi
-          printf 'SUPABASE_HOST = %s\nSUPABASE_ANON_KEY = %s\n' "$SUPABASE_HOST" "$SUPABASE_ANON_KEY" > Config/Secrets.xcconfig
+          if [ -z "$MS_CLIENT_ID" ]; then
+            echo "::warning::MS_CLIENT_ID secret not set; Connect Outlook will be hidden."
+          fi
+          {
+            printf 'SUPABASE_HOST = %s\n' "$SUPABASE_HOST"
+            printf 'SUPABASE_ANON_KEY = %s\n' "$SUPABASE_ANON_KEY"
+            printf 'MS_CLIENT_ID = %s\n' "$MS_CLIENT_ID"
+            printf 'MS_TENANT = %s\n' "${MS_TENANT:-common}"
+          } > Config/Secrets.xcconfig
 
       - name: Generate Xcode project
         run: xcodegen generate

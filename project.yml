@@ -49,6 +49,8 @@ targets:
         AppGroupID: $(APP_GROUP_ID)
         SupabaseHost: $(SUPABASE_HOST)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        MicrosoftClientID: $(MS_CLIENT_ID)
+        MicrosoftTenant: $(MS_TENANT)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).daycounter

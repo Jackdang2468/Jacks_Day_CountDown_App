@@ -23,8 +23,21 @@ emoji, and either a photo of your choice or one of seven gradient themes.
 Past events move to a collapsible "Past events" section and count up.
 The detail screen shows a live days/hours/minutes/seconds countdown.
 
-**Outlook calendar.** Two ways, no Microsoft setup needed:
-1. **Add to Calendar** opens Apple's New Event sheet pre-filled with the
+**Connect Outlook (in the app).** Settings > Connect Outlook signs in to a
+Microsoft work, school, or personal account (Microsoft's own sign-in page,
+so MFA and Conditional Access apply). After that:
+- **Add to Outlook** on any countdown creates the event straight in the
+  Outlook calendar through Microsoft Graph, with a reminder the day before.
+  Tap it again after editing and it shows **Update Outlook**.
+- Edits to a countdown that's already in Outlook update the Outlook event
+  automatically, and deleting the countdown deletes the event.
+- Optional "Add new countdowns automatically" toggle.
+- The Microsoft refresh token lives in the iOS Keychain on this phone only.
+  Signing out of the app also disconnects Outlook.
+This needs a free Entra app registration; steps in [OUTLOOK.md](OUTLOOK.md).
+
+**Fallbacks without Microsoft sign-in.** Two more ways, no setup needed:
+1. **iPhone Calendar** (under More) opens Apple's New Event sheet pre-filled with the
    event and a reminder one day before. Pick your Outlook/Exchange calendar
    in the Calendar field and it syncs to Outlook. This needs your work or
    personal Outlook account added under Settings > Calendar > Accounts (or
@@ -32,8 +45,9 @@ The detail screen shows a live days/hours/minutes/seconds countdown.
 2. **Share .ics** creates a standard calendar file you can send to Outlook
    by Mail, AirDrop to your PC, or open in the Outlook app.
 
-There's also a toggle in the New Countdown screen to jump straight into
-the calendar sheet after saving.
+The New Countdown screen has an "Add to Outlook" toggle, which uses the
+connected Outlook account, or falls back to the iPhone calendar sheet when
+Outlook sign-in isn't set up.
 
 **Widgets.** One "Countdown" widget in six sizes:
 - Home Screen: small, medium, large, showing your photo or theme behind
@@ -67,6 +81,10 @@ cyan/blue/violet palette, smooth number transitions, Dark Mode support.
   and only meant for testing. See SETUP.md for the options (turn off email
   confirmation for this personal app, or send through your own SMTP such as
   Microsoft 365).
+- **Outlook event links are per phone.** The app remembers which Outlook
+  event belongs to which countdown on this phone. If you also use the app on
+  a second device, edits there would create a new Outlook event rather than
+  update the first one.
 - **Password reset** isn't in this first version, because the reset link
   needs a web page to land on. You can reset a password from the Supabase
   dashboard (Authentication > Users).
@@ -83,7 +101,7 @@ cyan/blue/violet palette, smooth number transitions, Dark Mode support.
 | Area | Default | Alternatives |
 |---|---|---|
 | Sign-in | Email + password in Supabase | Sign in with your Microsoft (Entra ID) account using Supabase's Azure provider, so your M365 credentials and MFA/Conditional Access apply. Needs an Entra app registration. |
-| Outlook | iPhone calendar sheet + .ics | Microsoft Graph: the app writes straight to your Outlook calendar via the API. Needs an Entra app registration with `Calendars.ReadWrite` delegated permission; works even without Outlook on the phone. |
+| Outlook | In-app Connect Outlook (Graph), with iPhone calendar sheet + .ics as fallbacks | Sync Outlook to the iPhone Calendar app and use only the iPhone Calendar option, so no app registration is needed. |
 | Backend | Supabase | Firebase (Auth + Firestore), also free. Or no backend at all with iCloud, but iCloud needs a paid developer account. |
 | Install | Sideloadly / AltStore | Xcode on a Mac (most reliable), or a paid developer account for 1-year installs. |
 

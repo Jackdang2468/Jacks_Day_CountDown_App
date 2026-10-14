@@ -58,6 +58,9 @@ New repository secret**, add two secrets:
 | `SUPABASE_HOST` | `abcdefghijkl.supabase.co` |
 | `SUPABASE_ANON_KEY` | the anon / publishable key |
 
+For **Connect Outlook**, also add `MS_CLIENT_ID` and `MS_TENANT` from the
+Entra app registration in [OUTLOOK.md](OUTLOOK.md).
+
 Then **Actions > Build unsigned IPA > Run workflow** to build an app with
 sync turned on. (Without the secrets the app still builds, but runs in
 on-device-only mode.)
@@ -68,7 +71,8 @@ same two values. That file is git-ignored.
 
 ## 6. (Optional) Add your Outlook account to the iPhone
 
-For **Add to Calendar** to land in Outlook, your Outlook calendar must be on
+Only needed for the **iPhone Calendar** fallback; Connect Outlook doesn't
+need it. For the iPhone Calendar option to land in Outlook, your Outlook calendar must be on
 the phone: Settings > Calendar > Accounts > Add Account > Microsoft Exchange
 or Outlook.com. Or install the Outlook app and, in its settings, turn on
 calendar sync to iOS. If your tenant restricts native-mail access via
