@@ -127,12 +127,23 @@ final class CountdownStore {
         defer { isSyncing = false }
         do {
             // 1. Push what changed on this phone.
+            // A photo that fails to upload must not hold back the countdowns
+            // themselves; it stays queued and is retried on the next sync.
+            var photoError: Error?
             for key in pending.imageUploads where ImageStore.exists(key) {
-                try await sync.uploadImage(key: key)
-                pending.imageUploads.remove(key)
+                do {
+                    try await sync.uploadImage(key: key)
+                    pending.imageUploads.remove(key)
+                } catch {
+                    photoError = error
+                }
             }
-            try await sync.deleteImages(keys: Array(pending.imageDeletes))
-            pending.imageDeletes.removeAll()
+            do {
+                try await sync.deleteImages(keys: Array(pending.imageDeletes))
+                pending.imageDeletes.removeAll()
+            } catch {
+                photoError = photoError ?? error
+            }
 
             try await sync.delete(ids: Array(pending.deletes))
             pending.deletes.removeAll()
@@ -152,11 +163,34 @@ final class CountdownStore {
             countdowns = remote.sorted(by: Self.order)
             persist()
             lastSynced = .now
-            lastSyncError = nil
+            lastSyncError = photoError.map { "Photos couldn't sync. \(Self.syncReason($0))" }
         } catch {
             pending.save()
-            lastSyncError = "Couldn't sync. Your changes are saved on this phone and will sync later."
+            lastSyncError = "Couldn't sync. Your changes are saved on this phone. \(Self.syncReason(error))"
         }
+    }
+
+    /// Turns a Supabase error into a hint the user can act on.
+    private static func syncReason(_ error: Error) -> String {
+        let text = "\(error) \(error.localizedDescription)"
+        let lower = text.lowercased()
+        if ["repeats_yearly", "is_pinned", "reminders_enabled"].contains(where: lower.contains) {
+            return "The database needs an update: run supabase/migrations/0002_features.sql in the Supabase SQL Editor."
+        }
+        if lower.contains("bucket not found") || lower.contains("could not find the table")
+            || (lower.contains("relation") && lower.contains("does not exist")) {
+            return "The database isn't set up yet: run supabase/migrations/0001_countdowns.sql in the Supabase SQL Editor."
+        }
+        if lower.contains("row-level security") || lower.contains("row level security") {
+            return "Supabase refused the change (security policy). Run supabase/migrations/0001_countdowns.sql again."
+        }
+        if lower.contains("jwt") || lower.contains("not authenticated") || lower.contains("401") {
+            return "Your sign-in expired. Sign out and sign in again."
+        }
+        if lower.contains("offline") || lower.contains("network connection") || lower.contains("timed out") {
+            return "It will sync when you're back online."
+        }
+        return "Details: \(error.localizedDescription)"
     }
 
     // MARK: Private
