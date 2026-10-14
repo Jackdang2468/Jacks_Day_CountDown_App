@@ -1,0 +1,101 @@
+name: Simulator build
+
+# Builds the app for the iOS Simulator so it can run without an iPhone:
+#  - JacksDayCounter-simulator.zip: upload to appetize.io to use the app in a browser
+#  - screenshots: the app launched in a real iOS Simulator (light and dark mode)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
+
+concurrency:
+  group: simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Write config from repository secrets
+        env:
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_TENANT: ${{ secrets.MS_TENANT }}
+        run: |
+          {
+            printf 'SUPABASE_HOST = %s\n' "$SUPABASE_HOST"
+            printf 'SUPABASE_ANON_KEY = %s\n' "$SUPABASE_ANON_KEY"
+            printf 'MS_CLIENT_ID = %s\n' "$MS_CLIENT_ID"
+            printf 'MS_TENANT = %s\n' "${MS_TENANT:-common}"
+          } > Config/Secrets.xcconfig
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for the iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project JacksDayCounter.xcodeproj \
+            -scheme JacksDayCounter \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Package for Appetize
+        run: |
+          cd build/Build/Products/Debug-iphonesimulator
+          zip -qry "$GITHUB_WORKSPACE/JacksDayCounter-simulator.zip" JacksDayCounter.app
+
+      - name: Launch in the Simulator and take screenshots
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)['devices']
+          phones = [d for rt, ds in data.items() if 'iOS' in rt for d in ds if d['name'].startswith('iPhone')]
+          print(phones[-1]['udid'])")
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/JacksDayCounter.app
+          BUNDLE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" build/Build/Products/Debug-iphonesimulator/JacksDayCounter.app/Info.plist)
+          mkdir -p screenshots
+          xcrun simctl ui "$DEVICE" appearance light
+          xcrun simctl launch "$DEVICE" "$BUNDLE"
+          sleep 10
+          xcrun simctl io "$DEVICE" screenshot screenshots/launch-light.png
+          xcrun simctl ui "$DEVICE" appearance dark
+          sleep 3
+          xcrun simctl io "$DEVICE" screenshot screenshots/launch-dark.png
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v5
+        with:
+          name: JacksDayCounter-simulator
+          path: JacksDayCounter-simulator.zip
+          retention-days: 30
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v5
+        with:
+          name: simulator-screenshots
+          path: screenshots/
+          retention-days: 30
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: simulator-build-log
+          path: build.log
