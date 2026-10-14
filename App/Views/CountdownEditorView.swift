@@ -11,6 +11,8 @@ struct CountdownEditorView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var newImageData: Data?
     @State private var removeImage = false
+    @State private var isLoadingPhoto = false
+    @State private var photoError: String?
     @State private var addToCalendar = false
     @State private var showCalendarSheet = false
     @State private var isSaving = false
@@ -67,7 +69,18 @@ struct CountdownEditorView: View {
 
                 Section("Look") {
                     PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
-                        Label(previewImage == nil ? "Choose a photo" : "Change photo", systemImage: "photo")
+                        HStack {
+                            Label(previewImage == nil ? "Choose a photo" : "Change photo", systemImage: "photo")
+                            if isLoadingPhoto {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
+                    }
+                    if let photoError {
+                        Label(photoError, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
                     }
                     if previewImage != nil {
                         Button("Remove photo", systemImage: "trash", role: .destructive) {
@@ -130,10 +143,22 @@ struct CountdownEditorView: View {
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let prepared = ImageStore.prepareForStorage(data) {
+                    isLoadingPhoto = true
+                    photoError = nil
+                    defer { isLoadingPhoto = false }
+                    do {
+                        guard let data = try await item.loadTransferable(type: Data.self) else {
+                            photoError = "That photo isn't available on this device. Try another one."
+                            return
+                        }
+                        guard let prepared = ImageStore.prepareForStorage(data) else {
+                            photoError = "That file couldn't be read as a photo. Try another one."
+                            return
+                        }
                         newImageData = prepared
                         removeImage = false
+                    } catch {
+                        photoError = "Couldn't load that photo: \(error.localizedDescription)"
                     }
                 }
             }
