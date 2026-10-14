@@ -87,7 +87,9 @@ struct CountdownEditorView: View {
                         if outlook.isConfigured {
                             Text(outlook.isConnected
                                  ? "Adds this event to \(outlook.accountName ?? "your Outlook") calendar with a reminder the day before."
-                                 : "You'll sign in to your Microsoft account once, then events go straight to Outlook.")
+                                 : outlook.usesMicrosoftSignIn
+                                    ? "You'll sign in to your Microsoft account once, then events go straight to Outlook."
+                                    : "Uses the Outlook account on your iPhone. You'll be asked to allow calendar access once.")
                         } else {
                             Text("After saving, pick your Outlook or Exchange calendar in the next screen.")
                         }

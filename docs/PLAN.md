@@ -23,18 +23,20 @@ emoji, and either a photo of your choice or one of seven gradient themes.
 Past events move to a collapsible "Past events" section and count up.
 The detail screen shows a live days/hours/minutes/seconds countdown.
 
-**Connect Outlook (in the app).** Settings > Connect Outlook signs in to a
-Microsoft work, school, or personal account (Microsoft's own sign-in page,
-so MFA and Conditional Access apply). After that:
+**Connect Outlook (in the app).** Settings > Connect Outlook links your
+Outlook calendar. By default it uses the Outlook account added to the
+iPhone (no app registration needed). If you ever add an Entra app
+registration to the build, it switches to Microsoft sign-in and the Graph
+API instead. Either way:
 - **Add to Outlook** on any countdown creates the event straight in the
   Outlook calendar through Microsoft Graph, with a reminder the day before.
   Tap it again after editing and it shows **Update Outlook**.
 - Edits to a countdown that's already in Outlook update the Outlook event
   automatically, and deleting the countdown deletes the event.
 - Optional "Add new countdowns automatically" toggle.
-- The Microsoft refresh token lives in the iOS Keychain on this phone only.
-  Signing out of the app also disconnects Outlook.
-This needs a free Entra app registration; steps in [OUTLOOK.md](OUTLOOK.md).
+- With Microsoft sign-in, the refresh token lives in the iOS Keychain on
+  this phone only. Signing out of the app also disconnects Outlook.
+Setup for both options is in [OUTLOOK.md](OUTLOOK.md).
 
 **Fallbacks without Microsoft sign-in.** Two more ways, no setup needed:
 1. **iPhone Calendar** (under More) opens Apple's New Event sheet pre-filled with the

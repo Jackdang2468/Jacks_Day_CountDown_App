@@ -35,6 +35,20 @@ struct SettingsView: View {
                     Section {
                         if let account = outlook.accountName {
                             LabeledContent("Connected", value: account)
+                            if !outlook.usesMicrosoftSignIn && outlook.writableCalendars.count > 1 {
+                                Picker("Calendar", selection: Binding(
+                                    get: { outlook.phoneCalendarID ?? "" },
+                                    set: { id in
+                                        if let calendar = outlook.writableCalendars.first(where: { $0.calendarIdentifier == id }) {
+                                            outlook.choosePhoneCalendar(calendar)
+                                        }
+                                    }
+                                )) {
+                                    ForEach(outlook.writableCalendars, id: \.calendarIdentifier) { calendar in
+                                        Text("\(calendar.title) (\(calendar.source.title))").tag(calendar.calendarIdentifier)
+                                    }
+                                }
+                            }
                             Toggle("Add new countdowns automatically", isOn: Bindable(outlook).autoAdd)
                             Button("Disconnect Outlook", role: .destructive) { outlook.disconnect() }
                         } else {
@@ -57,7 +71,9 @@ struct SettingsView: View {
                     } header: {
                         Text("Outlook")
                     } footer: {
-                        Text("Sign in with your Microsoft work, school, or personal account. Events you add or edit here appear in your Outlook calendar, with a reminder the day before. Deleting a countdown removes its Outlook event.")
+                        Text(outlook.usesMicrosoftSignIn
+                             ? "Sign in with your Microsoft work, school, or personal account. Events you add or edit here appear in your Outlook calendar, with a reminder the day before. Deleting a countdown removes its Outlook event."
+                             : "Uses the Outlook account on this iPhone (Settings > Calendar > Accounts). Events you add or edit here appear in your Outlook calendar, with a reminder the day before. Deleting a countdown removes its Outlook event.")
                     }
                 }
 

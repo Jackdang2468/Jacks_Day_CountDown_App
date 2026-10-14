@@ -1,14 +1,20 @@
 import AuthenticationServices
 import CryptoKit
+import EventKit
 import Foundation
 import Observation
 import UIKit
 
-/// "Connect Outlook": signs in to a Microsoft work/school or personal account
-/// with OAuth 2.0 + PKCE and writes countdowns to the Outlook calendar
-/// through Microsoft Graph.
+/// "Connect Outlook". Two ways to reach the Outlook calendar:
 ///
-/// This does the OAuth flow directly instead of using MSAL because MSAL ties
+/// - **iPhone account** (default, no setup): the user's Outlook/Exchange
+///   account is added in iPhone Settings > Calendar > Accounts, and the app
+///   writes events to that calendar with EventKit. iOS syncs them to Outlook.
+/// - **Microsoft sign-in** (when the build has MS_CLIENT_ID): signs in with
+///   OAuth 2.0 + PKCE and writes events through Microsoft Graph. Needs an
+///   Entra app registration (docs/OUTLOOK.md).
+///
+/// The Graph path does the OAuth flow directly instead of using MSAL because MSAL ties
 /// its redirect URI and Keychain group to the app's bundle ID and team ID,
 /// which sideloading tools rewrite on every re-sign.
 @MainActor
@@ -28,8 +34,25 @@ final class OutlookService {
 
     var isConnected: Bool { accountName != nil }
 
-    /// Set from the build (MS_CLIENT_ID); empty means the feature is hidden.
-    var isConfigured: Bool { !clientID.isEmpty }
+    /// Outlook is always offered; this decides which path it uses.
+    var isConfigured: Bool { true }
+
+    /// True when the build carries an Entra client ID (MS_CLIENT_ID).
+    var usesMicrosoftSignIn: Bool { !clientID.isEmpty }
+
+    // iPhone-account path
+    private let eventStore = EKEventStore()
+    private(set) var phoneCalendarID: String? {
+        didSet { UserDefaults.standard.set(phoneCalendarID, forKey: "outlook.phoneCalendar") }
+    }
+
+    /// Calendars the app may write to, Outlook/Exchange ones first.
+    var writableCalendars: [EKCalendar] {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
+        return eventStore.calendars(for: .event)
+            .filter(\.allowsContentModifications)
+            .sorted { ($0.source.sourceType == .exchange ? 0 : 1, $0.title) < ($1.source.sourceType == .exchange ? 0 : 1, $1.title) }
+    }
 
     private let clientID = Bundle.main.object(forInfoDictionaryKey: "MicrosoftClientID") as? String ?? ""
     private let tenant: String = {
@@ -41,16 +64,28 @@ final class OutlookService {
     private var accessTokenExpiry = Date.distantPast
     private let webAuth = WebAuthenticator()
 
-    /// Countdown ID -> Outlook event ID, so edits update the same event.
+    /// Countdown ID -> event ID, so edits update the same event.
+    private var eventIDsKey: String { usesMicrosoftSignIn ? "outlook.eventIDs" : "outlook.phoneEventIDs" }
     private var eventIDs: [String: String] {
-        get { UserDefaults.standard.dictionary(forKey: "outlook.eventIDs") as? [String: String] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: "outlook.eventIDs") }
+        get { UserDefaults.standard.dictionary(forKey: eventIDsKey) as? [String: String] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: eventIDsKey) }
     }
 
     init() {
         autoAdd = UserDefaults.standard.bool(forKey: "outlook.autoAdd")
-        accountName = UserDefaults.standard.string(forKey: "outlook.account")
-        if Keychain.get("outlook.refresh") == nil { accountName = nil }
+        if usesMicrosoftSignIn {
+            accountName = UserDefaults.standard.string(forKey: "outlook.account")
+            if Keychain.get("outlook.refresh") == nil { accountName = nil }
+        } else if let id = UserDefaults.standard.string(forKey: "outlook.phoneCalendar"),
+                  EKEventStore.authorizationStatus(for: .event) == .fullAccess,
+                  let calendar = eventStore.calendar(withIdentifier: id) {
+            phoneCalendarID = id
+            accountName = Self.describe(calendar)
+        }
+    }
+
+    private static func describe(_ calendar: EKCalendar) -> String {
+        "\(calendar.title) (\(calendar.source.title))"
     }
 
     func isLinked(_ countdown: Countdown) -> Bool {
@@ -60,7 +95,10 @@ final class OutlookService {
     // MARK: Connect / disconnect
 
     func connect() async {
-        guard isConfigured else { return }
+        guard usesMicrosoftSignIn else {
+            await connectPhoneAccount()
+            return
+        }
         isWorking = true
         errorMessage = nil
         defer { isWorking = false }
@@ -109,6 +147,7 @@ final class OutlookService {
     }
 
     func disconnect() {
+        phoneCalendarID = nil
         Keychain.delete("outlook.refresh")
         accessToken = nil
         accountName = nil
@@ -120,6 +159,10 @@ final class OutlookService {
 
     /// Creates the Outlook event, or updates it if this countdown already has one.
     func addOrUpdate(_ countdown: Countdown) async throws {
+        guard usesMicrosoftSignIn else {
+            try phoneUpsert(countdown)
+            return
+        }
         let body = GraphEvent(countdown)
         if let existing = eventIDs[countdown.id.uuidString] {
             do {
@@ -135,8 +178,69 @@ final class OutlookService {
 
     func remove(_ countdown: Countdown) async {
         guard let existing = eventIDs[countdown.id.uuidString] else { return }
+        guard usesMicrosoftSignIn else {
+            if let event = eventStore.event(withIdentifier: existing) {
+                try? eventStore.remove(event, span: .thisEvent, commit: true)
+            }
+            eventIDs[countdown.id.uuidString] = nil
+            return
+        }
         try? await graphNoContent("DELETE", "/me/events/\(existing)")
         eventIDs[countdown.id.uuidString] = nil
+    }
+
+    // MARK: iPhone account
+
+    private func connectPhoneAccount() async {
+        isWorking = true
+        errorMessage = nil
+        defer { isWorking = false }
+        do {
+            guard try await eventStore.requestFullAccessToEvents() else {
+                errorMessage = "Calendar access is off. Turn it on in iPhone Settings > Privacy & Security > Calendars > Day Counter."
+                return
+            }
+            guard let calendar = writableCalendars.first(where: { $0.source.sourceType == .exchange }) else {
+                errorMessage = "No Outlook calendar on this iPhone yet. Add your account in iPhone Settings > Calendar > Accounts > Add Account > Microsoft Exchange (or Outlook.com), then tap Connect again."
+                return
+            }
+            choosePhoneCalendar(calendar)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func choosePhoneCalendar(_ calendar: EKCalendar) {
+        if phoneCalendarID != calendar.calendarIdentifier {
+            eventIDs = [:]
+        }
+        phoneCalendarID = calendar.calendarIdentifier
+        accountName = Self.describe(calendar)
+    }
+
+    private func phoneUpsert(_ c: Countdown) throws {
+        guard let id = phoneCalendarID, let calendar = eventStore.calendar(withIdentifier: id) else {
+            accountName = nil
+            throw OutlookError.message("The Outlook calendar isn't available. Connect Outlook again in Settings.")
+        }
+        let event = eventIDs[c.id.uuidString].flatMap { eventStore.event(withIdentifier: $0) }
+            ?? EKEvent(eventStore: eventStore)
+        event.calendar = calendar
+        event.title = [c.emoji, c.title].compactMap { $0 }.joined(separator: " ")
+        event.notes = c.notes.isEmpty ? "Added by Jack's Day Counter." : c.notes
+        event.isAllDay = c.isAllDay
+        if c.isAllDay {
+            let day = Calendar.current.startOfDay(for: c.targetDate)
+            event.startDate = day
+            event.endDate = day
+            event.availability = .free
+        } else {
+            event.startDate = c.targetDate
+            event.endDate = c.targetDate.addingTimeInterval(3600)
+        }
+        event.alarms = [EKAlarm(relativeOffset: -24 * 60 * 60)]
+        try eventStore.save(event, span: .thisEvent, commit: true)
+        eventIDs[c.id.uuidString] = event.eventIdentifier
     }
 
     /// Called by the store after every save/delete.

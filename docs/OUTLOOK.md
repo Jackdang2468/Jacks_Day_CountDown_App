@@ -1,10 +1,33 @@
-# Connect Outlook: Entra app registration
+# Connect Outlook
 
-The in-app **Connect Outlook** button signs users in with Microsoft and
-writes events through Microsoft Graph. It needs one free app registration.
-About 5 minutes in the Entra admin center.
+The in-app **Connect Outlook** button works one of two ways. The build
+decides which: if the `MS_CLIENT_ID` secret is set it uses Option B,
+otherwise Option A.
 
-## 1. Register the app
+## Option A: the Outlook account on your iPhone (default, no registration)
+
+1. iPhone **Settings > Calendar > Accounts > Add Account** > **Microsoft
+   Exchange** (work/school) or **Outlook.com** (personal). Sign in and make
+   sure **Calendars** is switched on.
+2. In Day Counter: **Settings > Connect Outlook** > allow calendar access.
+   The app picks your Outlook calendar automatically; you can change it in
+   the Calendar picker there.
+
+Done. Add to Outlook, edits, and deletes now write to that calendar, and
+iOS syncs them to Outlook everywhere.
+
+If your tenant blocks the built-in iOS Calendar/Mail apps (Conditional
+Access requiring an approved client app, or Exchange ActiveSync device
+access rules), the account won't sync. Then use Option B, or allow iOS
+native clients for your account or a security group you're in.
+
+## Option B: Microsoft sign-in through an Entra app registration
+
+The app signs in with Microsoft and writes events through Microsoft Graph,
+with no Outlook account needed on the phone. It needs one free app
+registration. About 5 minutes in the Entra admin center.
+
+### 1. Register the app
 
 1. Go to <https://entra.microsoft.com> > **Identity** > **Applications** >
    **App registrations** > **New registration**.
@@ -29,7 +52,7 @@ From the Overview page copy:
 No client secret or certificate: this is a public client app using PKCE,
 so there is nothing secret to store in the app.
 
-## 2. API permissions
+### 2. API permissions
 
 **API permissions** > **Add a permission** > **Microsoft Graph** >
 **Delegated permissions**, and add:
@@ -44,7 +67,7 @@ so there is nothing secret to store in the app.
 Then **Grant admin consent for <your tenant>**. This is required if your
 tenant blocks user consent, and it saves your users a consent prompt.
 
-## 3. Give the build the IDs
+### 3. Give the build the IDs
 
 GitHub repository > **Settings > Secrets and variables > Actions**:
 
@@ -53,10 +76,10 @@ GitHub repository > **Settings > Secrets and variables > Actions**:
 | `MS_CLIENT_ID` | the Application (client) ID |
 | `MS_TENANT` | your Directory (tenant) ID for single-tenant, or `common` for "any org + personal" (or `organizations` for any org, no personal) |
 
-Re-run **Actions > Build unsigned IPA**. Without `MS_CLIENT_ID` the Outlook
-buttons stay hidden and the iPhone Calendar / .ics options still work.
+Re-run **Actions > Build unsigned IPA** and reinstall. The app now uses
+Microsoft sign-in instead of the iPhone account.
 
-## Admin options worth knowing
+### Admin options worth knowing
 
 - **Limit who can connect:** Enterprise applications > Jack's Day Counter >
   Properties > **Assignment required = Yes**, then Users and groups > add a
@@ -72,7 +95,7 @@ buttons stay hidden and the iPhone Calendar / .ics options still work.
   disconnects everyone.
 - **Audit:** Entra sign-in logs show each connection under the app name.
 
-## Troubleshooting
+### Troubleshooting
 
 | Message in the app | Fix |
 |---|---|

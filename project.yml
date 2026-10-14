@@ -44,6 +44,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         NSCalendarsWriteOnlyAccessUsageDescription: Day Counter adds your countdown events to the calendar you choose, such as Outlook.
+        NSCalendarsFullAccessUsageDescription: Day Counter adds your countdowns to your Outlook calendar on this iPhone and keeps them up to date.
         NSCalendarsUsageDescription: Day Counter adds your countdown events to the calendar you choose, such as Outlook.
         NSPhotoLibraryUsageDescription: Choose a photo to show on your countdown and its widgets.
         AppGroupID: $(APP_GROUP_ID)
