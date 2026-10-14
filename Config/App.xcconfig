@@ -1,0 +1,14 @@
+// Shared build settings for the app and the widget extension.
+//
+// BUNDLE_ID_PREFIX must be unique to you. If Xcode says the bundle ID is
+// "not available", change it (for example add your initials or a number).
+BUNDLE_ID_PREFIX = com.jackdang2468
+APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).daycounter
+
+// Supabase connection. Real values live in Secrets.xcconfig (git-ignored),
+// or come from GitHub Actions secrets in the cloud build.
+// SUPABASE_HOST is the host only, e.g. abcdefghijkl.supabase.co (no https://).
+SUPABASE_HOST =
+SUPABASE_ANON_KEY =
+
+#include? "Secrets.xcconfig"
