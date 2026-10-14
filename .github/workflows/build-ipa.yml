@@ -1,0 +1,77 @@
+name: Build unsigned IPA
+
+# Builds the app on a free GitHub macOS runner and uploads an unsigned .ipa.
+# Sideloadly or AltStore signs it with your Apple ID when you install it.
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Write Supabase config from repository secrets
+        env:
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_TENANT: ${{ secrets.MS_TENANT }}
+        run: |
+          if [ -z "$SUPABASE_HOST" ]; then
+            echo "::warning::SUPABASE_HOST secret not set; the app will run without sync."
+          fi
+          if [ -z "$MS_CLIENT_ID" ]; then
+            echo "::notice::MS_CLIENT_ID not set; Connect Outlook uses the iPhone's Outlook account."
+          fi
+          {
+            printf 'SUPABASE_HOST = %s\n' "$SUPABASE_HOST"
+            printf 'SUPABASE_ANON_KEY = %s\n' "$SUPABASE_ANON_KEY"
+            printf 'MS_CLIENT_ID = %s\n' "$MS_CLIENT_ID"
+            printf 'MS_TENANT = %s\n' "${MS_TENANT:-common}"
+          } > Config/Secrets.xcconfig
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project JacksDayCounter.xcodeproj \
+            -scheme JacksDayCounter \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tee build.log | grep -E "error:|warning: .*Swift|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Package IPA
+        run: scripts/package-ipa.sh build/Build/Products/Release-iphoneos/JacksDayCounter.app JacksDayCounter.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v5
+        with:
+          name: JacksDayCounter-ipa
+          path: JacksDayCounter.ipa
+          retention-days: 30
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-log
+          path: build.log
